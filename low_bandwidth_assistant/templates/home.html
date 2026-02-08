@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Low Bandwidth AI Assistant</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <h1>🌐 Low Bandwidth AI Assistant</h1>
+    
+    <div class="info">
+        <strong>Optimized for Low Connectivity</strong><br>
+        Max response: {{ max_response_size|filesizeformat }} | 
+        Local KB + Web Fallback
+    </div>
+
+    <div class="query-box">
+        <input 
+            type="text" 
+            id="queryInput" 
+            placeholder="Ask a question (e.g., What crops are best for summer weather?)"
+            autofocus
+        >
+        <button id="askBtn" onclick="askQuestion()">Ask Question</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        // Ultra-minimal JavaScript for low bandwidth
+        const queryInput = document.getElementById('queryInput');
+        const askBtn = document.getElementById('askBtn');
+        const resultDiv = document.getElementById('result');
+
+        // Allow Enter key to submit
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') askQuestion();
+        });
+
+        async function askQuestion() {
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                showError('Please enter a question');
+                return;
+            }
+
+            // Show loading
+            askBtn.disabled = true;
+            askBtn.textContent = 'Searching...';
+            resultDiv.innerHTML = '<div class="loading">Searching for answer...</div>';
+
+            try {
+                const response = await fetch('/api/query/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResult(data);
+                } else {
+                    showError(data.error || 'An error occurred');
+                }
+            } catch (error) {
+                showError('Network error. Please check your connection.');
+            } finally {
+                askBtn.disabled = false;
+                askBtn.textContent = 'Ask Question';
+            }
+        }
+
+        function displayResult(data) {
+            const sourceClass = data.source === 'local' ? 'source-local' : 'source-web';
+            const sourceIcon = data.source === 'local' ? '📁' : '🌐';
+            
+            resultDiv.innerHTML = `
+                <div class="result">
+                    <p><strong>Answer:</strong></p>
+                    <p>${escapeHtml(data.answer)}</p>
+                    
+                    <div class="meta">
+                        <span class="${sourceClass}">
+                            ${sourceIcon} Source: ${data.source.toUpperCase()}
+                        </span>
+                        ${data.matched_keywords ? ` | Keywords: ${data.matched_keywords.join(', ')}` : ''}
+                        | Confidence: ${data.confidence}
+                        | Size: ${data.bytes} bytes
+                        ${data.truncated ? ' | <strong>Truncated</strong>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            resultDiv.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
